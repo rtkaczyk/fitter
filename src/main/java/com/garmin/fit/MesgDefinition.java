@@ -97,9 +97,9 @@ public class MesgDefinition {
 
          out.write(headerByte); // Message definition record header.
          out.write(0); // Reserved
-         out.write(Fit.ARCH_ENDIAN_BIG);
-         out.write(num >> 8);
+         out.write(Fit.ARCH_ENDIAN_LITTLE);
          out.write(num);
+         out.write(num >> 8);
          out.write(fields.size());
 
          for (FieldDefinition field : fields) {

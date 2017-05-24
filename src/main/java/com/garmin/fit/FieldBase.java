@@ -17,6 +17,8 @@
 
 package com.garmin.fit;
 
+import com.google.common.io.LittleEndianDataOutputStream;
+
 import java.io.*;
 import java.util.ArrayList;
 import java.math.BigInteger;
@@ -1188,7 +1190,7 @@ public abstract class FieldBase {
 
    private void writeValue(OutputStream out, Object value) {
       try {
-         DataOutputStream data = new DataOutputStream(out);
+         LittleEndianDataOutputStream data = new LittleEndianDataOutputStream(out);
 
          if (value == null) {
             switch (getType()) {
