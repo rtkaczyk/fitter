@@ -1,0 +1,10 @@
+.idea/
+target/
+dist/*
+project/boot/
+project/plugins/project/
+
+*.sc
+*.class
+*.log
+*.jar
