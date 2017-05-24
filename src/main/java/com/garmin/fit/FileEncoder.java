@@ -66,7 +66,7 @@ public class FileEncoder implements MesgListener, MesgDefinitionListener {
     * @param version
     *           Fit Protocol Version to use when writing files
     */
-   public FileEncoder(File file, Fit.ProtocolVersion version) {
+   public FileEncoder(java.io.File file, Fit.ProtocolVersion version) {
       this.version = version;
       validator = new ProtocolValidator(version);
       open(file);
