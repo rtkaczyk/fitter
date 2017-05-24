@@ -13,13 +13,15 @@ object Merge extends Mode {
     val encoder = new FileEncoder(new java.io.File(output), Fit.ProtocolVersion.V1_0)
 
     for ((input, i) <- inputs.zipWithIndex) {
-      val listener = new Listener(encoder, i == 0, i == inputs.size)
+      val listener = new Listener(encoder, i == 0, i == inputs.size - 1)
       val decoder = new Decode
       val in = new FileInputStream(input)
 
       decoder.read(in, listener, listener)
       in.close()
     }
+
+    encoder.close()
   }
 
   class Listener(encoder: FileEncoder, first: Boolean, last: Boolean) extends MesgListener with MesgDefinitionListener {
