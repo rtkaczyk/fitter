@@ -4,7 +4,7 @@ import java.io.FileInputStream
 
 import com.garmin.fit._
 
-object Merge extends Mode {
+class Merge extends Mode {
   def apply(args: List[String]): Unit = {
 
     val inputs = args.init
@@ -29,10 +29,13 @@ object Merge extends Mode {
   class Listener(encoder: FileEncoder, noFiles: Int)
     extends MesgListener with MesgDefinitionListener {
 
-    var lastActivity: ActivityMesg = null
     var lastSession: SessionMesg = null
-    var ignoreEvent: Boolean = false
 
+    def lastSessionTimestamp: Long =
+      Option(lastSession).map(_.getTimestamp.getTimestamp.toLong).getOrElse(0L)
+
+    def lastSessionDistance: Float =
+      Option(lastSession).map(_.getTotalDistance.toFloat).getOrElse(0.0f)
 
     var i = 0
 
@@ -48,31 +51,24 @@ object Merge extends Mode {
         if (first)
           encoder.write(mesg)
 
-      case MesgNum.ACTIVITY =>
-        mergeActivity(new ActivityMesg(mesg))
-        if (last)
-          encoder.write(lastActivity)
-
       case MesgNum.SESSION =>
         mergeSession(new SessionMesg(mesg))
-        ignoreEvent = true
-        if (last)
-          encoder.write(lastSession)
 
-
-      case MesgNum.LAP =>
-        //skip laps
-
-      case MesgNum.EVENT =>
-        if (ignoreEvent)
-          ignoreEvent = false
-        else
+      case MesgNum.DEVICE_INFO =>
+        if (first)
           encoder.write(mesg)
 
+      case MesgNum.ACTIVITY | MesgNum.LAP | MesgNum.EVENT | 22 | 210 | 219 =>
+
+
+      case 209 | 104 =>
+        val t = mesg.getField(253).getIntegerValue + Option(lastSession).map(_.getTimestamp.getTimestamp.toInt).getOrElse(0)
+        mesg.setFieldValue(253, t)
+        encoder.write(mesg)
 
       case MesgNum.RECORD =>
-        updateRecord(new RecordMesg(mesg))
-        //encoder.write(mesg)
+        updateRecord(mesg)
+        encoder.write(mesg)
 
       case _ =>
         updateTimestamp(mesg)
@@ -84,64 +80,31 @@ object Merge extends Mode {
         if (first)
           encoder.write(mesg)
 
-      case MesgNum.ACTIVITY =>
-        if (last)
-          encoder.write(mesg)
-
-      case MesgNum.SESSION =>
-        if (last)
-          encoder.write(mesg)
-
-      case MesgNum.LAP =>
-        //skip laps
-
-      case MesgNum.EVENT =>
-        if (ignoreEvent)
-          ignoreEvent = false
-        else
-          encoder.write(mesg)
+      case MesgNum.ACTIVITY | MesgNum.SESSION | MesgNum.LAP | MesgNum.EVENT | 22 | 210 | 219 =>
 
       case _ =>
         encoder.write(mesg)
     }
 
-    def mergeActivity(curr: ActivityMesg): Unit = {
-      if (lastActivity != null) {
-        curr.setTotalTimerTime(lastActivity.getTotalTimerTime + curr.getTotalTimerTime)
-        curr.setNumSessions(1)
-        updateTimestamp(curr)
-      }
-
-      lastActivity = curr
-    }
-
 
     def mergeSession(curr: SessionMesg): Unit = {
-      if (lastSession != null) {
-        curr.setTotalTimerTime(lastSession.getTotalTimerTime + curr.getTotalTimerTime)
-        curr.setTotalElapsedTime(lastSession.getTotalElapsedTime + curr.getTotalElapsedTime)
-        curr.setStartPositionLat(lastSession.getStartPositionLat)
-        curr.setStartPositionLong(lastSession.getStartPositionLong)
-        curr.setStartTime(lastSession.getStartTime)
-        curr.setTotalDistance(curr.getTotalDistance + lastSession.getTotalDistance)
-        updateTimestamp(curr)
-      }
-
+      curr.setTotalDistance(curr.getTotalDistance + lastSessionDistance)
+      updateTimestamp(curr)
       lastSession = curr
     }
 
-    def updateRecord(record: RecordMesg): Unit = {
+    def updateRecord(mesg: Mesg): Unit = {
+      val record = new RecordMesg(mesg)
       record.setDistance(record.getDistance + Option(lastSession).map(_.getTotalDistance.toFloat).getOrElse(0.0f))
       updateTimestamp(record)
-      encoder.write(record)
+      mesg.setFields(record)
     }
 
     def updateTimestamp(mesg: Mesg): Unit =
-      Option(mesg.getField("timestamp")).map { f =>
-        val t = f.getValue.asInstanceOf[Long]
-        f.setValue(t + Option(lastActivity).map(_.getTimestamp.getTimestamp.toLong).getOrElse(0L))
-        f
-      }.foreach(mesg.setField)
+      Option(mesg.getField("timestamp")).foreach { f =>
+        val t = f.getLongValue + lastSessionTimestamp
+        mesg.setFieldValue("timestamp", t)
+      }
   }
 
 }
