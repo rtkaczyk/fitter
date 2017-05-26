@@ -54,15 +54,11 @@ class Merge extends Mode {
       case MesgNum.SESSION =>
         mergeSession(new SessionMesg(mesg))
 
-      case MesgNum.DEVICE_INFO =>
-        if (first)
-          encoder.write(mesg)
-
-      case MesgNum.ACTIVITY | MesgNum.LAP | MesgNum.EVENT | 22 | 210 | 219 =>
+      case MesgNum.ACTIVITY | MesgNum.LAP =>
 
 
-      case 209 | 104 =>
-        val t = mesg.getField(253).getIntegerValue + Option(lastSession).map(_.getTimestamp.getTimestamp.toInt).getOrElse(0)
+      case 209 | 104 | 22 | 210 | 219 =>
+        val t = mesg.getField(253).getIntegerValue + lastSessionTimestamp.toInt
         mesg.setFieldValue(253, t)
         encoder.write(mesg)
 
@@ -80,7 +76,7 @@ class Merge extends Mode {
         if (first)
           encoder.write(mesg)
 
-      case MesgNum.ACTIVITY | MesgNum.SESSION | MesgNum.LAP | MesgNum.EVENT | 22 | 210 | 219 =>
+      case MesgNum.ACTIVITY | MesgNum.SESSION | MesgNum.LAP | MesgNum.EVENT =>
 
       case _ =>
         encoder.write(mesg)
