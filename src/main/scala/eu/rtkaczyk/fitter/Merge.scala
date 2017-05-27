@@ -30,6 +30,7 @@ class Merge extends Mode {
     extends MesgListener with MesgDefinitionListener {
 
     var lastSession: SessionMesg = null
+    var lastLap: LapMesg = null
 
     def lastSessionTimestamp: Long =
       Option(lastSession).map(_.getTimestamp.getTimestamp.toLong).getOrElse(0L)
@@ -54,7 +55,16 @@ class Merge extends Mode {
       case MesgNum.SESSION =>
         mergeSession(new SessionMesg(mesg))
 
-      case MesgNum.ACTIVITY | MesgNum.LAP =>
+      case MesgNum.LAP =>
+        val lap = new LapMesg(mesg)
+        if (first)
+          lastLap = lap
+        else
+          mergeLap(lap)
+        if (last)
+          encoder.write(lastLap)
+
+      case MesgNum.ACTIVITY =>
 
 
       case 209 | 104 | 22 | 210 | 219 =>
@@ -76,7 +86,11 @@ class Merge extends Mode {
         if (first)
           encoder.write(mesg)
 
-      case MesgNum.ACTIVITY | MesgNum.SESSION | MesgNum.LAP | MesgNum.EVENT =>
+      case MesgNum.ACTIVITY | MesgNum.SESSION | MesgNum.EVENT =>
+
+      case MesgNum.LAP =>
+        if (last)
+          encoder.write(mesg)
 
       case _ =>
         encoder.write(mesg)
@@ -89,9 +103,25 @@ class Merge extends Mode {
       lastSession = curr
     }
 
+    def mergeLap(curr: LapMesg): Unit = {
+      lastLap.setEndPositionLat(curr.getEndPositionLat)
+      lastLap.setEndPositionLong(curr.getEndPositionLong)
+      lastLap.setTotalAscent(lastLap.getTotalAscent + curr.getTotalAscent)
+      lastLap.setTotalDescent(lastLap.getTotalDescent + curr.getTotalDescent)
+      lastLap.setTotalTimerTime(lastLap.getTotalTimerTime + curr.getTotalTimerTime)
+      lastLap.setTotalElapsedTime(lastLap.getTotalElapsedTime + curr.getTotalElapsedTime)
+      lastLap.setMaxAltitude(math.max(lastLap.getMaxAltitude, curr.getMaxAltitude))
+      lastLap.setMaxSpeed(math.max(lastLap.getMaxSpeed, curr.getMaxSpeed))
+      lastLap.setTotalDistance(lastLap.getTotalDistance + curr.getTotalDistance)
+      lastLap.setEnhancedAvgSpeed(lastLap.getTotalDistance / lastLap.getTotalTimerTime)
+      lastLap.setFieldValue(SessionMesg.NecLatFieldNum, curr.getFieldValue(SessionMesg.NecLatFieldNum))
+      lastLap.setFieldValue(SessionMesg.NecLongFieldNum, curr.getFieldValue(SessionMesg.NecLongFieldNum))
+      updateTimestamp(lastLap)
+    }
+
     def updateRecord(mesg: Mesg): Unit = {
       val record = new RecordMesg(mesg)
-      record.setDistance(record.getDistance + Option(lastSession).map(_.getTotalDistance.toFloat).getOrElse(0.0f))
+      record.setDistance(record.getDistance + lastSessionDistance)
       updateTimestamp(record)
       mesg.setFields(record)
     }
